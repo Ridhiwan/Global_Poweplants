@@ -1,0 +1,122 @@
+---
+title: <center> Global Poweplants Fuel Analysis </center>
+author: <center> Ridhiwan Mseya </center>
+date: <center> 02/12/2022 </center>
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+ 
+<br>
+ 
+<br>
+  
+## 1. INTRODUCTION
+
+&nbsp;&nbsp;&nbsp;&nbsp; The world is in need of reliable and affordable green power sector. The shift towards cleaner energy that is environmentally sustainable forces us to rethink and reinvent better sources of energy to power our societies. To do this we first have to take a zoomed out look at the sources of energy around the world, the level of dependency towards those sources and their effects on the environment. Governments and companies will now make decisions that will depend on the power sector and its transformation towards green energy. For example, if a carbon tax is to be passed to certain sources of energy then the price of electricity will increase and affect prices of products and thus the economy.
+
+&nbsp;&nbsp;&nbsp;&nbsp; In this analysis we will use "The Global Plant Database" which is an open source and open access dataset of grid scale(1MW and greater) electricity generating facilities in the world. This dataset consists of the country, name of the power plant, the capacity in megawatts, the latitude and longitude of the plant, the primary fuel for power generation, year of commission, the generated electricity in gigawatt hours and more. We will incorporate the available data into a predictive model that guesses the primary fuel of a plant anywhere in the world based on its location, capacity and other parameters available in the data. Below is a quick view of our database:
+
+```{r, message=FALSE, warning=FALSE}
+library(tibble)
+library(readr)
+library(tidyverse)
+
+gppb <- read.csv("global_power_plant_database.csv", header = TRUE)
+
+gppb1 <- tibble(gppb)
+
+head(gppb1)
+
+```
+
+
+&nbsp;&nbsp;&nbsp;&nbsp; The ability to predict the type of fuel that could be used in a given location is essential in planning the type of emissions and waste that could be associated with electricity generation in that area. A pre-plan on how to mitigate the effects of the emissions and waste products will help in making the production process greener. New environment friendly technology can be developed years ahead of electricity production and specific to that location.
+
+<br>
+ 
+<br>
+  
+## 2. METHODS
+
+
+&nbsp;&nbsp;&nbsp;&nbsp; In this section we will visualize some aspects of our data, do some correlations and clustering tests, clean the data, alter its form if necessary and make a model using different methods like kmeans and random forest.
+
+
+### Clean the Data
+
+&nbsp;&nbsp;&nbsp;&nbsp; Before we perform any analysis we will first remove all the data that may cause inconsistency in our analysis.Some of the information in the columns in our data are not necessary for our analysis i.e. name of the country, name of power plant, other fuels, year of data generation.
+
+```{r, message=FALSE, warning=FALSE}
+# Choose columns wit the most essential data
+
+gppb2 <- gppb1 %>% select(gppd_idnr,capacity_mw,latitude,longitude,primary_fuel,
+                          generation_gwh_2013,generation_gwh_2014,generation_gwh_2015,generation_gwh_2016,generation_gwh_2017,estimated_generation_gwh)
+
+head(gppb2)
+
+# Assume the energy production was zero in the years that it was not recorded
+gppb2[is.na(gppb2)] <- 0
+head(gppb2)
+
+```
+
+
+
+
+### Correlation
+
+&nbsp;&nbsp;&nbsp;&nbsp; Correlation analysis of the variables in our database.
+
+```{r, message=FALSE, warning=FALSE}
+library(corrplot)
+
+# factorize the character columns
+gppb3 <- gppb2
+gppb3$gppd_idnr <- as.numeric(as.factor(gppb3$gppd_idnr))
+gppb3$primary_fuel <- as.numeric(as.factor(gppb3$primary_fuel))
+head(gppb3)
+
+# Plot the correlation figure
+corrplot(cor(gppb3),method = "color",type = "upper")
+
+```
+
+There is very little correlation between primary fuel and the latitude and longitudes of the powerplant. This is good because our model based on these parameters will have less bias. We also observe very high correlation between the generated energy from 2013 to 2017 because the capacity of the powerplant increases slightly in the scale of gigawatts throughout the years. We will remake these 5 energy columns into one column by finding the average over the 5 years.
+
+```{r, message=FALSE, warning=FALSE}
+# Average the energy generation columns into one
+
+gppb3$avg_gwh <- rowMeans(gppb3[,c(6:11)], na.rm = TRUE)
+
+gppb4 <- gppb3 %>% select(-c(generation_gwh_2013,generation_gwh_2014,generation_gwh_2015,generation_gwh_2016,generation_gwh_2017,estimated_generation_gwh))
+head(gppb4)
+
+
+```
+
+At this point any power plant that displays an average energy generation of zero should be removed because it has missing data for all the given years and will affect our model negatively. Then we will re-plot our correlation plot.
+
+```{r, message=FALSE, warning=FALSE}
+# remove rows with zero average energy generation
+gppb5 <- gppb4[gppb4$avg_gwh != 0,]
+
+#plot new correlation plot
+corrplot(cor(gppb5),method = "color",type = "upper")
+```
+
+In this plot there is stronger correlation between average energy generation and the capacity of the power plant which makes sense.There is also an interesting negative correlation between the capacity of the power plant and the primary fuel. Same goes for primary fuel and the average energy generated. These could mean that our generation power and capacity strongly depend on the primary fuel, which seems obvious.
+
+
+### Visualization
+
+&nbsp;&nbsp;&nbsp;&nbsp; We will investigate some of the features observable in our data. Let us start with the total energy that each primary fuel has produced all over the world.
+
+```{r, message=FALSE, warning=FALSE}
+
+
+```
+
+
