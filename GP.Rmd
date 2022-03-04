@@ -112,11 +112,130 @@ In this plot there is stronger correlation between average energy generation and
 
 ### Visualization
 
-&nbsp;&nbsp;&nbsp;&nbsp; We will investigate some of the features observable in our data. Let us start with the total energy that each primary fuel has produced all over the world.
+&nbsp;&nbsp;&nbsp;&nbsp; We will investigate some of the features observable in our data. Let us start with the mean energy that each primary fuel has produced all over the world.
 
 ```{r, message=FALSE, warning=FALSE}
+library(ggplot2)
 
+# Add a column with string chracters for primary fuel
+gppb4$primary_fuel_chr <- add_column(gppb2$primary_fuel)
+
+# Create a plot
+gppb4 %>% select(avg_gwh,primary_fuel_chr) %>% group_by(primary_fuel_chr) %>%
+  summarise(mean_gwh = mean(avg_gwh)) %>% ggplot(aes(primary_fuel_chr,mean_gwh)) + geom_bar(stat = "identity", color = "blue", fill = "blue") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
 
+We can observe that on average the most power producing plants are those with the primary fuel of nuclear, Coal, petcoke and gas. Nuclear energy has very high output per powerplant compared to any of the other fuels. Now let us view the most total energy produced by each fuel around the world.
+
+```{r, message=FALSE, warning=FALSE}
+
+# Create a plot
+gppb4 %>% select(avg_gwh,primary_fuel_chr) %>% group_by(primary_fuel_chr) %>%
+  summarise(total_gwh = sum(avg_gwh)) %>% ggplot(aes(primary_fuel_chr,total_gwh))+  geom_bar(stat = "identity", color = "blue", fill = "blue") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+```
+
+In terms of the total energy produced Coal leads the way followed by Gas. Hydro and Nuclear almost have the same contribution. The rest of the renewable energy sources have little contribution into powering the world.
+
+
+### Models
+
+The models that we will develop have a goal of predicting the most probable primary fuel to be used at a given location once we know the latitude and longitude of that area. In order to do this we will first need to   do some stratification of our data.The strata of the rounded off longitude and latitudes will cover a greater region than the specific position provided by the original database.
+
+```{r, message=FALSE, warning=FALSE}
+
+# Round off the latitude and longitudes into integers for stratification
+gppb6 <- gppb5
+gppb6$longitude <- round(gppb6$longitude)
+gppb6$latitude <- round(gppb6$latitude)
+head(gppb6)
+```
+
+#### K-Means
+
+The first model will be unsupervised in which we will do clustering using the k-means algorithm. We will get rid of the id,longitude and latitude columns of the powerplants and rescale all the values of the remaining columns.
+
+```{r, message=FALSE, warning=FALSE}
+#edit and rescale the dataset
+gppb7 <- gppb6 %>% mutate(capacity_mw = scale(capacity_mw),
+                          longitude = scale(longitude),
+                          primary_fuel = scale(primary_fuel),
+                          avg_gwh = scale(avg_gwh)) %>% select(-c(gppd_idnr,latitude))
+
+head(gppb7)
+```
+
+Let us animate the clustering using longitude and primary fuel to observe the process of clustering and the type of separation that is possible. We will choose the number of clusters to be less than half the number of different fuel types for illustration purposes.
+
+```{r, message=FALSE, warning=FALSE}
+# Make the first animation of longitude and primary fuel
+set.seed(2233)
+library(animation)
+ani.options(nmax = 3)
+kmeans.ani(gppb7[2:3],6, pch = 1:6, col = 1:6)
+```
+
+As it has been shown above from the many steps that the k-means algorithm takes to move centers and find clusters, our data can be clustered but knowing the number of clusters to start with is not easy. We will use a strategy that will give us a graph that will help us choose the most optimal number of clusters to use for our analysis. The elbow method is a good method for large datasets as it looks at the variance as a function of the number of clusters.
+
+```{r, message=FALSE, warning=FALSE}
+# Analyse the best number of clusters
+k.max <- 15
+data <- gppb7
+wss <- sapply(1:k.max, 
+              function(k){kmeans(data, k, nstart=50,iter.max = 15 )$tot.withinss})
+wss
+```
+
+```{r, message=FALSE, warning=FALSE}
+# plot total within sum of squares for each cluster count
+tab <- cbind.data.frame(1:k.max,wss)
+colnames(tab) <- c("k","ws")
+tab %>% ggplot(aes(k, ws)) + geom_line() +geom_point()
+```
+
+6 looks like the optimal number of clusters for our data as the change seems to be minimal as we keep adding more clusters after that point.
+
+```{r, message=FALSE, warning=FALSE}
+# Redo kmeans with optimal k
+set.seed(2233)
+clst <- kmeans(gppb7,6)
+clst$size
+centr <- clst$centers
+centr
+```
+
+From the cluster size we can see that there is some sort of homogeinity in the clusters which might be good. Let us dig deeper into the centers and see how the features stack up into the clusters.
+
+```{r, message=FALSE, warning=FALSE}
+# create dataset for reshape
+cluster <- c(1: 6)
+centered <- data.frame(cluster, centr)
+
+# Reshape the data
+reshaped <- gather(centered, feature, value, capacity_mw: avg_gwh)
+head(reshaped,10)
+```
+
+Let us now create the heatmap to visualize the intesity of features in clusters.
+
+```{r, message=FALSE, warning=FALSE}
+library(RColorBrewer)
+# Create the palette
+heat.palette <-colorRampPalette(rev(brewer.pal(10, 'RdYlGn')),space='Lab')
+
+#make the plot of the heatmap
+reshaped %>% ggplot(aes(x = feature, y = cluster, fill = value)) +
+    scale_y_continuous(breaks = seq(1, 6, by = 1)) +
+    geom_tile() +
+    coord_equal() +
+    scale_fill_gradientn(colours = heat.palette(90)) +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+The sixth cluster which was the smallest cluster by size, has a high intensity of two features that are related to energy production while the rest of the clusters have an almost homogeneous distribution of the features in each cluster. The latitudes with unsupervised learning can be grouped into 6 clusters.
+
+
+#### Random Forest
 
