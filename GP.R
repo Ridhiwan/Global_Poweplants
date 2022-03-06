@@ -1,3 +1,18 @@
+# Install missing packages
+if (!require(tibble)) install.packages('tibble')
+if (!require(readr)) install.packages('readr')
+if (!require(tidyverse)) install.packages('tidyverse')
+if (!require(corrplot)) install.packages('corrplot')
+if (!require(ggplot2)) install.packages('ggplot2')
+if (!require(animation)) install.packages('animation')
+if (!require(RColorBrewer)) install.packages('RColorBrewer')
+if (!require(e1071)) install.packages('e1071')
+if (!require(caret)) install.packages('caret')
+if (!require(randomForest)) install.packages('randomForest')
+if (!require(doParallel)) install.packages('doParallel')
+if (!require(animation)) install.packages('animation')
+
+
 # Display the global power plant schema
 
 library(tibble)
