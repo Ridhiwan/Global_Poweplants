@@ -1,8 +1,10 @@
 ---
-title: <center> Global Poweplants Fuel Analysis </center>
-author: <center> Ridhiwan Mseya </center>
-date: <center> 02/12/2022 </center>
-output: html_document
+title: "<center> Global Poweplants Fuel Analysis </center>"
+author: "<center> Ridhiwan Mseya </center>"
+date: "<center> 02/12/2022 </center>"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -17,7 +19,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 &nbsp;&nbsp;&nbsp;&nbsp; The world is in need of reliable and affordable green power sector. The shift towards cleaner energy that is environmentally sustainable forces us to rethink and reinvent better sources of energy to power our societies. To do this we first have to take a zoomed out look at the sources of energy around the world, the level of dependency towards those sources and their effects on the environment. Governments and companies will now make decisions that will depend on the power sector and its transformation towards green energy. For example, if a carbon tax is to be passed to certain sources of energy then the price of electricity will increase and affect prices of products and thus the economy.
 
-&nbsp;&nbsp;&nbsp;&nbsp; In this analysis we will use "The Global Plant Database" which is an open source and open access dataset of grid scale(1MW and greater) electricity generating facilities in the world. This dataset consists of the country, name of the power plant, the capacity in megawatts, the latitude and longitude of the plant, the primary fuel for power generation, year of commission, the generated electricity in gigawatt hours and more. We will incorporate the available data into a predictive model that guesses the primary fuel of a plant anywhere in the world based on its location, capacity and other parameters available in the data. Below is a quick view of our database:
+&nbsp;&nbsp;&nbsp;&nbsp; In this analysis we will use "The Global Plant Database" which is an open source and open access dataset of grid scale(1MW and greater) electricity generating facilities in the world. This dataset consists of the country, name of the power plant, the capacity in megawatts, the latitude and longitude of the plant, the primary fuel for power generation, year of commission, the generated electricity in gigawatt hours and more. We will incorporate the available data into a predictive model that guesses the primary fuel of prospective plant anywhere in the world based on its location, capacity and other parameters available in the data. Below is a quick view of our database:
 
 ```{r, message=FALSE, warning=FALSE}
 library(tibble)
@@ -53,7 +55,8 @@ head(gppb1)
 # Choose columns wit the most essential data
 
 gppb2 <- gppb1 %>% select(gppd_idnr,capacity_mw,latitude,longitude,primary_fuel,
-                          generation_gwh_2013,generation_gwh_2014,generation_gwh_2015,generation_gwh_2016,generation_gwh_2017,estimated_generation_gwh)
+                          generation_gwh_2013,generation_gwh_2014,generation_gwh_2015,
+                          generation_gwh_2016,generation_gwh_2017,estimated_generation_gwh)
 
 head(gppb2)
 
@@ -91,7 +94,9 @@ There is very little correlation between primary fuel and the latitude and longi
 
 gppb3$avg_gwh <- rowMeans(gppb3[,c(6:11)], na.rm = TRUE)
 
-gppb4 <- gppb3 %>% select(-c(generation_gwh_2013,generation_gwh_2014,generation_gwh_2015,generation_gwh_2016,generation_gwh_2017,estimated_generation_gwh))
+gppb4 <- gppb3 %>% select(-c(generation_gwh_2013,generation_gwh_2014,
+                             generation_gwh_2015,generation_gwh_2016,generation_gwh_2017,
+                             estimated_generation_gwh))
 head(gppb4)
 
 
@@ -122,7 +127,10 @@ gppb4$primary_fuel_chr <- add_column(gppb2$primary_fuel)
 
 # Create a plot
 gppb4 %>% select(avg_gwh,primary_fuel_chr) %>% group_by(primary_fuel_chr) %>%
-  summarise(mean_gwh = mean(avg_gwh)) %>% ggplot(aes(primary_fuel_chr,mean_gwh)) + geom_bar(stat = "identity", color = "blue", fill = "blue") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  summarise(mean_gwh = mean(avg_gwh)) %>%
+  ggplot(aes(primary_fuel_chr,mean_gwh)) + 
+  geom_bar(stat = "identity", color = "blue", fill = "blue") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
 
@@ -132,7 +140,10 @@ We can observe that on average the most power producing plants are those with th
 
 # Create a plot
 gppb4 %>% select(avg_gwh,primary_fuel_chr) %>% group_by(primary_fuel_chr) %>%
-  summarise(total_gwh = sum(avg_gwh)) %>% ggplot(aes(primary_fuel_chr,total_gwh))+  geom_bar(stat = "identity", color = "blue", fill = "blue") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  summarise(total_gwh = sum(avg_gwh)) %>% 
+  ggplot(aes(primary_fuel_chr,total_gwh)) +
+  geom_bar(stat = "identity", color = "blue", fill = "blue") +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
 
@@ -150,9 +161,8 @@ gppb6$latitude <- round(gppb6$latitude)
 head(gppb6)
 ```
 
-### CLustering
 
-#### K-Means
+### K-Means Clustering
 
 The first model will be unsupervised in which we will do clustering using the k-means algorithm. We will get rid of the id,longitude and latitude columns of the powerplants and rescale all the values of the remaining columns.
 
@@ -205,7 +215,7 @@ centr <- clst$centers
 centr
 ```
 
-From the cluster size we can see that there is some sort of homogeinity in the clusters which might be good. Let us dig deeper into the centers and see how the features stack up into the clusters.
+From the cluster size we can see that there is some sort of homogeinity in the clusters which might be good. Let us dig deeper into the centers and get a peek of how the features stack up into the clusters.
 
 ```{r, message=FALSE, warning=FALSE}
 # create dataset for reshape
@@ -217,7 +227,7 @@ reshaped <- gather(centered, feature, value, capacity_mw: avg_gwh)
 head(reshaped,10)
 ```
 
-Let us now create the heatmap to visualize the intesity of features in clusters.
+Let us now create the heatmap to visualize the intensity of features in clusters.
 
 ```{r, message=FALSE, warning=FALSE}
 library(RColorBrewer)
@@ -237,13 +247,13 @@ reshaped %>% ggplot(aes(x = feature, y = cluster, fill = value)) +
 The sixth cluster which was the smallest cluster by size, has a high intensity of two features that are related to energy production while the rest of the clusters have an almost homogeneous distribution of the features in each cluster. The latitudes with unsupervised learning can be grouped into 6 clusters.
 
 
-### Models
+### Introduction to Models
 
-The models that we will develop have a goal of predicting the most probable primary fuel to be used at a given location once we know the latitude and longitude of that area. We will use the latitude as the predictor in our models.
+&nbsp;&nbsp;&nbsp;&nbsp; The models that we will develop have a goal of predicting the most probable primary fuel to be used at a given location once we know the latitude and longitude and other parameters specific to the powerplant. 
 
-#### Random Forest
+### Random Forest
 
-Random forest is a supervised learning approach that uses decisions of the many to predict the most probable result for a given model. For our dataset we will train a model and choose the best parameters for prediction accordingly.
+&nbsp;&nbsp;&nbsp;&nbsp; Random forest is a supervised learning approach that uses decisions of the many to predict the most probable result for a given model. For our dataset we will train a model and choose the best parameters for prediction accordingly.
 
 Let us start by training our model on small different datasets and then combine their results. This will need us to split our data into test and train sets since I have a lot of observables around 29,000 thus I can split my data by 80/20 or 90/10 or somewhere in between as the variance of my parameters will be okay with either of the two. For the purpose of easier computation, I will use the 80/20 split.
 
@@ -255,7 +265,8 @@ library(e1071)
 # Here we use the version of our datasets that contains-
 # all important columns with original values
 set.seed(2233)
-test_ind <- createDataPartition(as.factor(gppb5$primary_fuel),p=0.2, list = FALSE, times = 1)
+test_ind <- createDataPartition(as.factor(gppb5$primary_fuel),p=0.2
+                                ,list = FALSE, times = 1)
 
 test_data <- gppb5[test_ind,]
 train_data <- gppb5[-test_ind,]
@@ -284,14 +295,17 @@ trControl <- trainControl(method = "cv",
 tunegrid = expand.grid(.mtry=c(1:20))
 
 # train the model
-rf_model <- train(as.factor(primary_fuel)~., sampsize=7000,train_data, method = "parRF", ntree=300, tuneGrid = tunegrid, trControl = trControl)
+rf_model <- train(as.factor(primary_fuel)~., sampsize=7000, train_data,
+                  method = "parRF", ntree=300, tuneGrid = tunegrid, 
+                  trControl = trControl)
 
 #the loop
 loop_rf <- foreach(ntree=rep(300,cores),
                    .combine = combine,
                    .multicombine = TRUE,
                    .packages = "randomForest") %dopar% 
-  randomForest(as.factor(primary_fuel)~., sampsize =7000,train_data, ntree=ntree, tuneGrid = tunegrid)
+  randomForest(as.factor(primary_fuel)~., sampsize =7000, train_data,
+               ntree=ntree, tuneGrid = tunegrid)
 
 stopCluster(clt)
 print(rf_model)
@@ -319,7 +333,9 @@ trControl <- trainControl(method = "cv",
     search = "grid")
 
 # train the model
-rf_model1 <- train(as.factor(primary_fuel)~., sampsize=10000,train_data, method = "parRF", ntree=500, tuneGrid = tunegrid, trControl = trControl)
+rf_model1 <- train(as.factor(primary_fuel)~., sampsize=10000, train_data, 
+                   method = "parRF", ntree=500, tuneGrid = tunegrid, 
+                   trControl = trControl)
 
 #the loop
 loop_rf <- foreach(ntree=rep(500,cores),
@@ -348,7 +364,7 @@ Our prediction parameters give as an accuracy of 0.85 which is good for a first 
 
 
 
-####  Support Vector Machines
+###  Support Vector Machines
 
 &nbsp;&nbsp;&nbsp;&nbsp; Random Forest is known for over fitting data in its models. We will use Support Vector Machines(SVMs) to try and get a prediction that is more discriminating in its classification. Better classes will lead to better prediction.
 
@@ -357,7 +373,8 @@ We have already split our data and trained it in the previous part. This time we
 ```{r, message=FALSE, warning=FALSE}
 set.seed(1558)
 #train the model
-svm_model <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "linear")
+svm_model <- svm(as.factor(primary_fuel)~., train_data,
+                 type = "C-classification", kernel = "linear")
 print(svm_model)
 ```
 
@@ -377,7 +394,8 @@ Let us increase the cost of our classifier to see if the accuracy will increase 
 ```{r, message=FALSE, warning=FALSE}
 set.seed(1558)
 #train the model
-svm_model1 <- svm(as.factor(primary_fuel)~., train_data, cost = 20, type = "C-classification", kernel = "linear")
+svm_model1 <- svm(as.factor(primary_fuel)~., train_data, cost = 20,
+                  type = "C-classification", kernel = "linear")
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -395,7 +413,8 @@ Increasing the cost from the default 0f 1 to 20 makes a very small improvement t
 ```{r, message=FALSE, warning=FALSE}
 set.seed(1558)
 #train the model
-svm_model2 <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "radial")
+svm_model2 <- svm(as.factor(primary_fuel)~., train_data,
+                  type = "C-classification", kernel = "radial")
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -413,7 +432,8 @@ With radial kernel our prediction becomes a bit better than random chance. We wi
 ```{r, message=FALSE, warning=FALSE}
 set.seed(1558)
 #train the model
-svm_model3 <- svm(as.factor(primary_fuel)~., train_data,cost = 200, type = "C-classification", kernel = "radial")
+svm_model3 <- svm(as.factor(primary_fuel)~., train_data,cost = 200,
+                  type = "C-classification", kernel = "radial")
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -428,6 +448,18 @@ acc
 In order to achieve at least 70% accuracy our cost of misclassification has to be very high and the decision surface is far from smooth.
 
 
-### Results
+## 3. RESULTS
 
+&nbsp;&nbsp;&nbsp;&nbsp; The initial steps for our analysis involved unsupervised learning in order to try and get a better picture of our data. From the K-means clustering it can be inferred that they are roughly six categories in our data and these categories most likely contain the most prevalent primary fuels in the world. These fuels have the most total energy produced within the span of 6 years as per the database. The fuels are coal,gas,hydro,nuclear,wind and bio-waste. That is to mean that whenever you choose a location in the world and try to build a power plant then these six are the initial sources of energy to consider as their output will be sufficient and their technology is mature.
+
+&nbsp;&nbsp;&nbsp;&nbsp; The next step was to do supervised learning with the most important parameters in our dataset. The goal was to predict primary fuels using the provided parameters which included the longitude and latitude of the powerplants, the energy produced by the plants and the capacity of the powerplant. Random forest models worked best for our analysis and managed a prediction accuracy of 0.85. This is not very good accuracy but it is enough to have informed decisions on the fuel of choice for a given area after the estimated values of the rest of the parameters have been provided. 
+
+&nbsp;&nbsp;&nbsp;&nbsp; The support vector machines were not successful at giving a proper prediction. The level of dimensions of the dataset was a bit high for this supervised learning algorithm. We had to let the cost be very high to just get an acceptable accuracy of 70%. Thus the use of this method will require an investment of time and computational resources  to try and fine tune the results and it still may not be plug and play for other datasets that are of the similar nature as the current database.
+
+
+## 4. CONCLUSION
+
+&nbsp;&nbsp;&nbsp;&nbsp; The methods used in this analysis have several set backs that may add bias to our predictions. The random forest models are usually hindered by the size of the dataset, my prediction was done on a sample size that is almost half the size of the training data. This is because as the number of trees increase the algorithm gets slower and slower making it hard to make predictions in real time. Random Forest can also overfit and fails to discover patterns that are outside the training set. On the other hand SVM regression is good at extrapolation and we used it for the second part of our prediction. We expected better results from SVM but it was the opposite, the accuracy was below 50% and getting it to 70% needed a lot of bending towards the data.SVM is not good with large datasets that dont have clear separation and since we have 15 classes that overlap into mainly 6 as it was shown in K-means clustering then our results were bound to be mediocre at best.
+
+&nbsp;&nbsp;&nbsp;&nbsp; In conclusion random forest came up as the better algorithm for modelling predictions of the dataset. With a few more iterations we can get a model that has an accuracy above 90% which is very good for our purpose. We can therefore predict the primary fuel that is suitable for a given area provided that we have estimated values for the rest of the parameters.
 
