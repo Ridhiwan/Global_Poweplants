@@ -116,5 +116,135 @@ reshaped %>% ggplot(aes(x = feature, y = cluster, fill = value)) +
   theme_classic() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
+library(caret)
+library(e1071)
+
+# Split the data into train and test sets
+# Here we use the version of our datasets that contains-
+# all important columns with original values
+set.seed(2233)
+test_ind <- createDataPartition(as.factor(gppb5$primary_fuel),p=0.2, list = FALSE, times = 1)
+
+test_data <- gppb5[test_ind,]
+train_data <- gppb5[-test_ind,]
+
+head(test_data)
+
+library(randomForest)
+library(doParallel)
+
+set.seed(1558)
+
+# set up parallelism
+cores <- 3
+clt <- makePSOCKcluster(cores)
+registerDoParallel(clt)
+
+# choose parameters for training
+trControl <- trainControl(method = "cv",
+                          number = 7,
+                          search = "grid")
+
+# tune the grid 
+tunegrid = expand.grid(.mtry=c(1:20))
+
+# train the model
+rf_model <- train(as.factor(primary_fuel)~., sampsize=7000,train_data, method = "parRF", ntree=300, tuneGrid = tunegrid, trControl = trControl)
+
+#the loop
+loop_rf <- foreach(ntree=rep(300,cores),
+                   .combine = combine,
+                   .multicombine = TRUE,
+                   .packages = "randomForest") %dopar% 
+  randomForest(as.factor(primary_fuel)~., sampsize =7000,train_data, ntree=ntree, tuneGrid = tunegrid)
+
+stopCluster(clt)
+print(rf_model)
+
+library(randomForest)
+library(doParallel)
+
+set.seed(1558)
+
+# set up parallelism
+cores <- 3
+clt <- makePSOCKcluster(cores)
+registerDoParallel(clt)
+
+# set mtry
+tunegrid = expand.grid(.mtry = 3)
+
+# choose parameters for training
+trControl <- trainControl(method = "cv",
+                          number = 10,
+                          search = "grid")
+
+# train the model
+rf_model1 <- train(as.factor(primary_fuel)~., sampsize=10000,train_data, method = "parRF", ntree=500, tuneGrid = tunegrid, trControl = trControl)
+
+#the loop
+loop_rf <- foreach(ntree=rep(500,cores),
+                   .combine = combine,
+                   .multicombine = TRUE,
+                   .packages = "randomForest") %dopar% 
+  randomForest(as.factor(primary_fuel)~., sampsize =10000,train_data, ntree=ntree, tuneGrid = tunegrid)
+
+stopCluster(clt)
+print(rf_model1)
+
+# make the prediction
+pred <- predict(rf_model1,test_data)
+
+# Check the accuracy of the prediction
+acc <- confusionMatrix(pred, as.factor(test_data$primary_fuel))
+acc$overall
+
+set.seed(1558)
+#train the model
+svm_model <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "linear")
+print(svm_model)
+
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+
+set.seed(1558)
+#train the model
+svm_model1 <- svm(as.factor(primary_fuel)~., train_data, cost = 20, type = "C-classification", kernel = "linear")
 
 
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model1,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+
+set.seed(1558)
+#train the model
+svm_model2 <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "radial")
+
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model2,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+
+set.seed(1558)
+#train the model
+svm_model3 <- svm(as.factor(primary_fuel)~., train_data,cost = 200, type = "C-classification", kernel = "radial")
+
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model3,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc

@@ -117,7 +117,7 @@ In this plot there is stronger correlation between average energy generation and
 ```{r, message=FALSE, warning=FALSE}
 library(ggplot2)
 
-# Add a column with string chracters for primary fuel
+# Add a column with string characters for primary fuel
 gppb4$primary_fuel_chr <- add_column(gppb2$primary_fuel)
 
 # Create a plot
@@ -139,9 +139,7 @@ gppb4 %>% select(avg_gwh,primary_fuel_chr) %>% group_by(primary_fuel_chr) %>%
 In terms of the total energy produced Coal leads the way followed by Gas. Hydro and Nuclear almost have the same contribution. The rest of the renewable energy sources have little contribution into powering the world.
 
 
-### Models
-
-The models that we will develop have a goal of predicting the most probable primary fuel to be used at a given location once we know the latitude and longitude of that area. In order to do this we will first need to   do some stratification of our data.The strata of the rounded off longitude and latitudes will cover a greater region than the specific position provided by the original database.
+ In order to do this we will first need to   do some stratification of our data.The strata of the rounded off longitude and latitudes will cover a greater region than the specific position provided by the original database.
 
 ```{r, message=FALSE, warning=FALSE}
 
@@ -151,6 +149,8 @@ gppb6$longitude <- round(gppb6$longitude)
 gppb6$latitude <- round(gppb6$latitude)
 head(gppb6)
 ```
+
+### CLustering
 
 #### K-Means
 
@@ -237,5 +237,197 @@ reshaped %>% ggplot(aes(x = feature, y = cluster, fill = value)) +
 The sixth cluster which was the smallest cluster by size, has a high intensity of two features that are related to energy production while the rest of the clusters have an almost homogeneous distribution of the features in each cluster. The latitudes with unsupervised learning can be grouped into 6 clusters.
 
 
+### Models
+
+The models that we will develop have a goal of predicting the most probable primary fuel to be used at a given location once we know the latitude and longitude of that area. We will use the latitude as the predictor in our models.
+
 #### Random Forest
+
+Random forest is a supervised learning approach that uses decisions of the many to predict the most probable result for a given model. For our dataset we will train a model and choose the best parameters for prediction accordingly.
+
+Let us start by training our model on small different datasets and then combine their results. This will need us to split our data into test and train sets since I have a lot of observables around 29,000 thus I can split my data by 80/20 or 90/10 or somewhere in between as the variance of my parameters will be okay with either of the two. For the purpose of easier computation, I will use the 80/20 split.
+
+```{r, message=FALSE, warning=FALSE}
+library(caret)
+library(e1071)
+
+# Split the data into train and test sets
+# Here we use the version of our datasets that contains-
+# all important columns with original values
+set.seed(2233)
+test_ind <- createDataPartition(as.factor(gppb5$primary_fuel),p=0.2, list = FALSE, times = 1)
+
+test_data <- gppb5[test_ind,]
+train_data <- gppb5[-test_ind,]
+
+head(test_data)
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(randomForest)
+library(doParallel)
+
+set.seed(1558)
+
+# set up parallelism
+cores <- 3
+clt <- makePSOCKcluster(cores)
+registerDoParallel(clt)
+
+# choose parameters for training
+trControl <- trainControl(method = "cv",
+    number = 7,
+    search = "grid")
+
+# tune the grid 
+tunegrid = expand.grid(.mtry=c(1:20))
+
+# train the model
+rf_model <- train(as.factor(primary_fuel)~., sampsize=7000,train_data, method = "parRF", ntree=300, tuneGrid = tunegrid, trControl = trControl)
+
+#the loop
+loop_rf <- foreach(ntree=rep(300,cores),
+                   .combine = combine,
+                   .multicombine = TRUE,
+                   .packages = "randomForest") %dopar% 
+  randomForest(as.factor(primary_fuel)~., sampsize =7000,train_data, ntree=ntree, tuneGrid = tunegrid)
+
+stopCluster(clt)
+print(rf_model)
+```
+
+From the above analysis the best parameter for mtry is 3. We will repeat our model with this parameter and try to fine tune the sample size and the number of times we do cross validations.
+
+```{r, message=FALSE, warning=FALSE}
+library(randomForest)
+library(doParallel)
+
+set.seed(1558)
+
+# set up parallelism
+cores <- 3
+clt <- makePSOCKcluster(cores)
+registerDoParallel(clt)
+
+# set mtry
+tunegrid = expand.grid(.mtry = 3)
+
+# choose parameters for training
+trControl <- trainControl(method = "cv",
+    number = 10,
+    search = "grid")
+
+# train the model
+rf_model1 <- train(as.factor(primary_fuel)~., sampsize=10000,train_data, method = "parRF", ntree=500, tuneGrid = tunegrid, trControl = trControl)
+
+#the loop
+loop_rf <- foreach(ntree=rep(500,cores),
+                   .combine = combine,
+                   .multicombine = TRUE,
+                   .packages = "randomForest") %dopar% 
+  randomForest(as.factor(primary_fuel)~., sampsize =10000,train_data, ntree=ntree, tuneGrid = tunegrid)
+
+stopCluster(clt)
+print(rf_model1)
+```
+
+Our accuracy with our second model is 0.85 which is not bad considering our sample size of only 10000 out of the 23000 available samples. We will stop our tuning at this point and check for the prediction power of the model next.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+# make the prediction
+pred <- predict(rf_model1,test_data)
+
+# Check the accuracy of the prediction
+acc <- confusionMatrix(pred, as.factor(test_data$primary_fuel))
+acc$overall
+```
+
+Our prediction parameters give as an accuracy of 0.85 which is good for a first time model to which we have not done extensive parameter optimization due to time and computational cost limitations.
+
+
+
+####  Support Vector Machines
+
+&nbsp;&nbsp;&nbsp;&nbsp; Random Forest is known for over fitting data in its models. We will use Support Vector Machines(SVMs) to try and get a prediction that is more discriminating in its classification. Better classes will lead to better prediction.
+
+We have already split our data and trained it in the previous part. This time we will only train our data and see how well the new model performs.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+#train the model
+svm_model <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "linear")
+print(svm_model)
+```
+
+Now let us check the prediction accuracy for our initial svm analysis.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+```
+Let us increase the cost of our classifier to see if the accuracy will increase from 0.35 which is very bad.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+#train the model
+svm_model1 <- svm(as.factor(primary_fuel)~., train_data, cost = 20, type = "C-classification", kernel = "linear")
+```
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model1,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+```
+
+Increasing the cost from the default 0f 1 to 20 makes a very small improvement that is negligible. This time we will adjust the type of kernel used and see how better our model gets.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+#train the model
+svm_model2 <- svm(as.factor(primary_fuel)~., train_data, type = "C-classification", kernel = "radial")
+```
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model2,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+```
+
+With radial kernel our prediction becomes a bit better than random chance. We will again try increasing the cost and see if it will have a major improvement or minor one.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+#train the model
+svm_model3 <- svm(as.factor(primary_fuel)~., train_data,cost = 200, type = "C-classification", kernel = "radial")
+```
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(1558)
+# make the prediction
+pred <- predict(svm_model3,test_data)
+
+# Check the accuracy of the prediction
+acc <- mean(test_data$primary_fuel==pred)
+acc
+```
+In order to achieve at least 70% accuracy our cost of misclassification has to be very high and the decision surface is far from smooth.
+
+
+### Results
+
 
