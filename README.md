@@ -1,4 +1,4 @@
-# Global_Poweplants
+# Global_Powerplants
 
 &nbsp;&nbsp;&nbsp;&nbsp; The world is in need of reliable and affordable green power sector. The shift towards cleaner energy that is environmentally sustainable forces us to rethink and reinvent better sources of energy to power our societies. To do this we first have to take a zoomed out look at the sources of energy around the world, the level of dependency towards those sources and their effects on the environment. Governments and companies will now make decisions that will depend on the power sector and its transformation towards green energy. For example, if a carbon tax is to be passed to certain sources of energy then the price of electricity will increase and affect prices of products and thus the economy.
 
